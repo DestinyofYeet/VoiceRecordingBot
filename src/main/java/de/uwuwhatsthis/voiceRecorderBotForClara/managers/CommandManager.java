@@ -1,9 +1,10 @@
-package de.uwuwhatsthis.voiceRecorderBotForClara.main;
+package de.uwuwhatsthis.voiceRecorderBotForClara.managers;
 
 
 
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Args;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Embed;
+import de.uwuwhatsthis.voiceRecorderBotForClara.main.Main;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.Constants;
 import net.dv8tion.jda.api.entities.ChannelType;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
