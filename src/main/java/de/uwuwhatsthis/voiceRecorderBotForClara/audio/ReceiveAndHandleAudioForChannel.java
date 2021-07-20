@@ -132,6 +132,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             delFile();
             return;
         }
+        delFile(); // delete original .wav file
 
 
         fileName = fileName.replace(".wav", ".mp3");
