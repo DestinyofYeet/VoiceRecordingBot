@@ -41,8 +41,8 @@ public class PlayerManager {
         return musicManager;
     }
 
-    public void loadAndPlay(final TextChannel channel, final String trackURL){
-        final GuildMusicManager musicManager = getGuildMusicManager(channel.getGuild());
+    public void loadAndPlay(final Guild guild, final String trackURL){
+        final GuildMusicManager musicManager = getGuildMusicManager(guild);
 
         playerManager.loadItemOrdered(musicManager, trackURL, new AudioLoadResultHandler() {
             @Override

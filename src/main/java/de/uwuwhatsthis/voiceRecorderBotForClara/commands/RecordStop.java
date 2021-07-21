@@ -19,7 +19,7 @@ public class RecordStop {
 
         for (VoiceChannel vc: Constants.audioMap.keySet()){
             if (vc.getGuild().getIdLong() == event.getGuild().getIdLong()){
-                event.getChannel().sendMessageEmbeds(new Embed("Stopping recording!", "Stopping recording...", Color.GREEN).build()).queue();
+                event.getChannel().sendMessageEmbeds(new Embed("Stopping recording...", "Stopping recording... Please wait", Color.GREEN).build()).queue();
                 stopRecording(vc);
                 event.getChannel().sendMessageEmbeds(new Embed("Stopped recording", "Stopped the recording in voicechannel " + vc.getAsMention() + "!", Color.GREEN).build()).queue();
                 return;

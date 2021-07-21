@@ -2,6 +2,7 @@ package de.uwuwhatsthis.voiceRecorderBotForClara.audio;
 
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Cache;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Embed;
+import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Status;
 import de.uwuwhatsthis.voiceRecorderBotForClara.main.Main;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.helper;
 import net.dv8tion.jda.api.audio.AudioReceiveHandler;
@@ -10,12 +11,14 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.exceptions.ErrorHandler;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.xml.soap.Text;
 import java.awt.*;
 import java.io.*;
+import java.net.SocketTimeoutException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -47,7 +50,24 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             return;
         }
 
-        // System.out.println("Successfully joined vc");
+        PlayerManager playerManager = PlayerManager.getInstance();
+        playerManager.loadAndPlay(voiceChannel.getGuild(), Main.config.getPreMessagePath());
+
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        while (playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack() != null){
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        helper.setRecordingStatus(voiceChannel.getGuild(), Status.RECORDING);
 
         voiceChannel.getGuild().getAudioManager().setReceivingHandler(new AudioReceiveHandler() {
 
@@ -66,6 +86,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
     }
 
     public void saveAudio(){
+        helper.setRecordingStatus(voiceChannel.getGuild(), Status.IDLE);
         File file = new File("data/" + fileName);
 
         byte[] byteData = helper.convertObjectArrayToByteArray(voiceData);
@@ -85,6 +106,19 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             } catch (IllegalArgumentException e){
                 // file too big
                 compressFileToMp3(channel);
+            } catch (ErrorResponseException e){
+                int i = 1;
+                while (i <= 10){
+                    try{
+                        channel.sendMessageEmbeds(new Embed("Error", "There was an error while trying to upload the file... Retrying " + i + "/10 attempts!", Color.RED).build()).queue();
+                        channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".wav").complete();
+                        break;
+                    } catch (ErrorResponseException noted){
+                        i++;
+                    }
+
+                }
+
             }
 
         } else {
