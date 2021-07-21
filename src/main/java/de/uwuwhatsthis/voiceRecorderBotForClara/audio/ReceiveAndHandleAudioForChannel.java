@@ -1,6 +1,11 @@
 package de.uwuwhatsthis.voiceRecorderBotForClara.audio;
 
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Cache;
+import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Debugger;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Embed;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Status;
 import de.uwuwhatsthis.voiceRecorderBotForClara.main.Main;
@@ -50,8 +55,29 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             return;
         }
 
+        final Debugger debugger =  Main.debugManager.getDebugger(voiceChannel.getGuild());
+
         PlayerManager playerManager = PlayerManager.getInstance();
-        playerManager.loadAndPlay(voiceChannel.getGuild(), Main.config.getPreMessagePath());
+        playerManager.loadAndPlay(voiceChannel.getGuild(), Main.config.getPreMessagePath(), new AudioLoadResultHandler() {
+            @Override
+            public void trackLoaded(AudioTrack audioTrack) {
+               debugger.debug("Successfully played the pre-recording message");
+            }
+
+            @Override
+            public void playlistLoaded(AudioPlaylist audioPlaylist) {
+
+            }
+
+            @Override
+            public void noMatches() {
+                debugger.error("Could not find the pre-recording message");
+            }
+
+            @Override
+            public void loadFailed(FriendlyException e) {
+            }
+        });
 
         try {
             Thread.sleep(500);

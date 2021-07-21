@@ -84,6 +84,13 @@ public class PlayerManager {
         });
     }
 
+    public void loadAndPlay(final Guild guild, final String trackUrl, final AudioLoadResultHandler handler){
+        final GuildMusicManager musicManager = getGuildMusicManager(guild);
+
+        playerManager.loadItemOrdered(musicManager, trackUrl, handler);
+
+    }
+
     private void play(GuildMusicManager musicManager, AudioTrack track){
         musicManager.scheduler.queue(track);
     }

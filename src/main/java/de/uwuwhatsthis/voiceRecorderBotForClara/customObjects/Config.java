@@ -7,6 +7,7 @@ public class Config {
     private String token;
     private String prefix;
     private String preMessagePath;
+    private boolean debug;
 
     public Config(String filePath){
         this.filePath = filePath;
@@ -17,6 +18,7 @@ public class Config {
         token = JsonStuff.getStringFromJson(filePath, "token");
         prefix = JsonStuff.getStringFromJson(filePath, "prefix");
         preMessagePath = JsonStuff.getStringFromJson(filePath, "pre_recording_message_path");
+        debug = JsonStuff.getBoolFromJson(filePath, "debug", false);
     }
 
     public String getFilePath() {
@@ -33,5 +35,9 @@ public class Config {
 
     public String getPreMessagePath() {
         return preMessagePath;
+    }
+
+    public boolean isDebug() {
+        return debug;
     }
 }
