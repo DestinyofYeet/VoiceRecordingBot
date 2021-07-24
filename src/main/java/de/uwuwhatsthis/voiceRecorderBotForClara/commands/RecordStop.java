@@ -17,7 +17,7 @@ public class RecordStop {
             return;
         }
 
-        for (VoiceChannel vc: Constants.audioMap.keySet()){
+        for (VoiceChannel vc: Constants.AUDIO_MAP.keySet()){
             if (vc.getGuild().getIdLong() == event.getGuild().getIdLong()){
                 event.getChannel().sendMessageEmbeds(new Embed("Stopping recording...", "Stopping recording... Please wait", Color.GREEN).build()).queue();
                 stopRecording(vc);
@@ -30,8 +30,9 @@ public class RecordStop {
     }
 
     public static void stopRecording(VoiceChannel vc){
-        ReceiveAndHandleAudioForChannel audioHandler = Constants.audioMap.get(vc);
-        Constants.audioMap.remove(vc);
+        ReceiveAndHandleAudioForChannel audioHandler = Constants.AUDIO_MAP.get(vc);
+        Constants.AUDIO_MAP.remove(vc);
+        Constants.USER_ALLOWED_IN_CHANNEL.remove(vc);
 
         vc.getGuild().getAudioManager().setReceivingHandler(null);
 

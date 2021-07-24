@@ -32,8 +32,8 @@ public class CommandManager extends ListenerAdapter {
 
             String commandName = event.getMessage().getContentRaw().split(prefix)[1].split(" ")[0];
 
-            if (Constants.commandMap.containsKey(commandName)){
-                commandName = Constants.commandMap.get(commandName);
+            if (Constants.COMMAND_MAP.containsKey(commandName)){
+                commandName = Constants.COMMAND_MAP.get(commandName);
 
             } else {
                 commandName = commandName.substring(0, 1).toUpperCase() + commandName.substring(1).toLowerCase();

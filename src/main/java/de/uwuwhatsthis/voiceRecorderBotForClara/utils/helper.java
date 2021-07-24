@@ -1,10 +1,7 @@
 package de.uwuwhatsthis.voiceRecorderBotForClara.utils;
 
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Status;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.TextChannel;
-import net.dv8tion.jda.api.entities.VoiceChannel;
+import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.exceptions.ErrorHandler;
 import net.dv8tion.jda.api.requests.ErrorResponse;
 
@@ -13,7 +10,10 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class helper {
 
@@ -91,5 +91,43 @@ public class helper {
         bot.modifyNickname(status.getText()).queue(null, new ErrorHandler().handle(ErrorResponse.MISSING_PERMISSIONS, e -> {
             System.err.println("No permissions to modify the nickname on guild \"" + guild.getName() + "\"!");
         }));
+    }
+
+    public static boolean hasConsented(VoiceChannel voiceChannel, User member){
+        if (!Constants.USER_ALLOWED_IN_CHANNEL.containsKey(voiceChannel)){
+            return false;
+        }
+
+        List<Long> userAllowed = Constants.USER_ALLOWED_IN_CHANNEL.get(voiceChannel);
+
+       return userAllowed.contains(member.getIdLong());
+    }
+
+    public synchronized static void addMemberToAllowedChannelList(VoiceChannel voiceChannel, User member){
+        if (!Constants.USER_ALLOWED_IN_CHANNEL.containsKey(voiceChannel)){
+            Constants.USER_ALLOWED_IN_CHANNEL.put(voiceChannel, new ArrayList<Long>(){{
+                add(member.getIdLong());
+            }});
+            return;
+        }
+
+        ArrayList<Long> list = Constants.USER_ALLOWED_IN_CHANNEL.get(voiceChannel);
+
+        list.add(member.getIdLong());
+
+        Constants.USER_ALLOWED_IN_CHANNEL.put(voiceChannel, list);
+    }
+
+    public synchronized static void removeMemberFromAllowedChannelList(VoiceChannel voiceChannel, User member){
+        if (!Constants.USER_ALLOWED_IN_CHANNEL.containsKey(voiceChannel)){
+            Constants.USER_ALLOWED_IN_CHANNEL.put(voiceChannel, new ArrayList<>());
+            return;
+        }
+
+        ArrayList<Long> list = Constants.USER_ALLOWED_IN_CHANNEL.get(voiceChannel);
+
+        list.remove(member.getIdLong());
+
+        Constants.USER_ALLOWED_IN_CHANNEL.put(voiceChannel, list);
     }
 }

@@ -1,12 +1,17 @@
 package de.uwuwhatsthis.voiceRecorderBotForClara.customObjects;
 
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.JsonStuff;
+import org.json.JSONObject;
 
 public class Config {
     private final String filePath;
     private String token;
     private String prefix;
     private String preMessagePath;
+    private String cloudDomain;
+    private String cloudEmail;
+    private String cloudPassword;
+
     private boolean debug;
 
     public Config(String filePath){
@@ -15,10 +20,20 @@ public class Config {
     }
 
     private void init(){
-        token = JsonStuff.getStringFromJson(filePath, "token");
-        prefix = JsonStuff.getStringFromJson(filePath, "prefix");
-        preMessagePath = JsonStuff.getStringFromJson(filePath, "pre_recording_message_path");
-        debug = JsonStuff.getBoolFromJson(filePath, "debug", false);
+        String fileContent = JsonStuff.getFileContent(filePath);
+        if (fileContent == null){
+            System.err.println("COULD NOT READ CONFIG.....EXITING");
+            System.exit(1);
+        }
+
+        JSONObject jsonObject = new JSONObject(fileContent);
+        token = jsonObject.getString("token");
+        prefix = jsonObject.getString("prefix");
+        preMessagePath = jsonObject.getString("pre_recording_message_path");
+        debug = jsonObject.getBoolean("debug");
+        cloudDomain = jsonObject.getString("cloud_domain");
+        cloudEmail = jsonObject.getString("cloud_email");
+        cloudPassword = jsonObject.getString("cloud_password");
     }
 
     public String getFilePath() {
@@ -39,5 +54,17 @@ public class Config {
 
     public boolean isDebug() {
         return debug;
+    }
+
+    public String getCloudEmail() {
+        return cloudEmail;
+    }
+
+    public String getCloudPassword() {
+        return cloudPassword;
+    }
+
+    public String getCloudDomain() {
+        return cloudDomain;
     }
 }

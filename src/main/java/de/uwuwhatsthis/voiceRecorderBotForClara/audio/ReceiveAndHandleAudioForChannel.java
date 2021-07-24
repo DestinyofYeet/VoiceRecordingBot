@@ -4,19 +4,21 @@ import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
-import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Cache;
-import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Debugger;
-import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Embed;
-import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Status;
+import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.*;
 import de.uwuwhatsthis.voiceRecorderBotForClara.main.Main;
+import de.uwuwhatsthis.voiceRecorderBotForClara.messageReactionStuff.ReactionEmotes;
+import de.uwuwhatsthis.voiceRecorderBotForClara.utils.Constants;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.helper;
 import net.dv8tion.jda.api.audio.AudioReceiveHandler;
 import net.dv8tion.jda.api.audio.CombinedAudio;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.exceptions.ErrorHandler;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -37,9 +39,11 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
     private final ArrayList<byte[]> voiceData = new ArrayList<>();
     private String fileName;
     private boolean shouldDelete = true;
+    private MessageReceivedEvent event;
 
-    public ReceiveAndHandleAudioForChannel(VoiceChannel voiceChannel){
+    public ReceiveAndHandleAudioForChannel(VoiceChannel voiceChannel, MessageReceivedEvent event){
         this.voiceChannel = voiceChannel;
+        this.event = event;
         fileName = "audio_" + voiceChannel.getId() + ".wav";
 
         Thread thread = new Thread(this);
@@ -57,6 +61,40 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
         final Debugger debugger =  Main.debugManager.getDebugger(voiceChannel.getGuild());
 
+
+        // getting consent from all members before starting the recording
+        for (Member member: voiceChannel.getMembers()){
+            member.getUser().openPrivateChannel().queue(privateChannel -> {
+                new ConsentMessage(privateChannel, voiceChannel, debugger);
+            });
+        }
+
+        debugger.info("Sent out all consent messages!");
+        // event.getChannel().sendMessageEmbeds(new Embed("Consent", "Sent out all consent messages!", Color.GREEN).build()).queue();
+
+        // waiting 60 seconds for users to consent, then proceed to kick everyone from the vc that did not consent
+        try {
+            Thread.sleep(60*1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // event.getChannel().sendMessageEmbeds(new Embed("Consent", "Kicking all users that did not consent from the voice channel!", Color.GREEN).build()).queue();
+
+        for (Member member: voiceChannel.getMembers()){
+            if (member.getUser() == event.getJDA().getSelfUser()) continue;
+
+            if (!helper.hasConsented(voiceChannel, member.getUser())){
+                member.getUser().openPrivateChannel().queue(privateChannel -> {
+                    // privateChannel.sendMessageEmbeds(new Embed("Did not consent", "Since you did not consent, you will be removed from the voice channel!", Color.RED).build()).queue();
+                    voiceChannel.getGuild().moveVoiceMember(member, null).complete(); // disconnects them from the voice channel
+                });
+
+            }
+        }
+
+
+        // loading & playing the pre-recorded message
         PlayerManager playerManager = PlayerManager.getInstance();
         playerManager.loadAndPlay(voiceChannel.getGuild(), Main.config.getPreMessagePath(), new AudioLoadResultHandler() {
             @Override
@@ -79,12 +117,14 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             }
         });
 
+        // waiting for the player to register the track so we can wait using a while loop
         try {
             Thread.sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
+        System.out.println(playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack());
         while (playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack() != null){
             try {
                 Thread.sleep(100);
@@ -93,8 +133,11 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             }
         }
 
+        event.getChannel().sendMessageEmbeds(new Embed("Recording", "The bot is now recording in channel " + voiceChannel.getAsMention() + "!", Color.GREEN).build()).queue();
+
         helper.setRecordingStatus(voiceChannel.getGuild(), Status.RECORDING);
 
+        // recording stuff
         voiceChannel.getGuild().getAudioManager().setReceivingHandler(new AudioReceiveHandler() {
 
             @Override
@@ -200,8 +243,16 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         try{
             channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3").complete();
         } catch (IllegalArgumentException e){
-            // file too big
-            channel.sendMessageEmbeds(new Embed("Error", "File too big to send! Retrieve it locally!", Color.RED).build()).queue();
+            // file too big -> upload to cloud
+
+            try {
+                Files.copy(Paths.get("data/" + fileName), Paths.get("data/" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3"));
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+
+            fileName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3";
+            new FileUpload(new File("data/" + fileName));
         }
     }
 

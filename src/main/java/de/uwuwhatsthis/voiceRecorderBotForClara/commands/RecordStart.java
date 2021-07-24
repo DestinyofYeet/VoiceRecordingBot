@@ -35,9 +35,14 @@ public class RecordStart {
             return;
         }
 
+        if (voiceChannel.getMembers().isEmpty()){
+            event.getChannel().sendMessageEmbeds(new Embed("Error", "The channel you are trying to record is empty!", Color.RED).build()).queue();
+            return;
+        }
+
         AtomicBoolean shouldExit = new AtomicBoolean(false);
 
-        Constants.audioMap.forEach((VoiceChannel, ReceiveAndHandleAudioForChannel) -> {
+        Constants.AUDIO_MAP.forEach((VoiceChannel, ReceiveAndHandleAudioForChannel) -> {
             if (VoiceChannel.getGuild().getIdLong() == event.getGuild().getIdLong()){
                 event.getChannel().sendMessageEmbeds(new Embed("Error", "The bot is already recording channel " + VoiceChannel.getAsMention() + "!", Color.RED).build()).queue();
                 shouldExit.set(true);
@@ -46,10 +51,10 @@ public class RecordStart {
 
         if (shouldExit.get()) return;
 
-        ReceiveAndHandleAudioForChannel audioMananger = new ReceiveAndHandleAudioForChannel(voiceChannel);
+        ReceiveAndHandleAudioForChannel audioMananger = new ReceiveAndHandleAudioForChannel(voiceChannel, event);
 
-        Constants.audioMap.put(voiceChannel, audioMananger);
+        Constants.AUDIO_MAP.put(voiceChannel, audioMananger);
 
-        event.getChannel().sendMessageEmbeds(new Embed("Started recording!", "Started recording in channel " + voiceChannel.getAsMention() + "!", Color.GREEN).build()).queue();
+        // event.getChannel().sendMessageEmbeds(new Embed("Started recording!", "Started recording in channel " + voiceChannel.getAsMention() + "!", Color.GREEN).build()).queue();
     }
 }
