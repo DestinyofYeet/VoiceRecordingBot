@@ -11,12 +11,16 @@ public class GuildVoiceLeaveEventListener extends ListenerAdapter {
 
     @Override
     public void onGuildVoiceLeave(GuildVoiceLeaveEvent event){
+
         if (!event.getGuild().getMember(event.getJDA().getSelfUser()).getVoiceState().inVoiceChannel()) return;
 
         // if the bot is alone in a voice channel, stop all music and leave the channel
 
         if (event.getChannelLeft().equals(event.getGuild().getMember(event.getJDA().getSelfUser()).getVoiceState().getChannel())){
-            if (event.getChannelLeft().getMembers().size() == 1){
+            if (event.getChannelLeft().getMembers()
+                    .stream()
+                    .filter(member -> !member.getUser().isBot())
+                    .count() < 1){
                 GuildMusicManager manager = PlayerManager.getInstance().getGuildMusicManager(event.getGuild());
                 AudioManager audioManager = event.getGuild().getAudioManager();
                 audioManager.closeAudioConnection();

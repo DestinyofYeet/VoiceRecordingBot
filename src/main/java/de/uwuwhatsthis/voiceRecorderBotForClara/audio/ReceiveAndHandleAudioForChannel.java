@@ -40,6 +40,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
     private String fileName;
     private boolean shouldDelete = true;
     private MessageReceivedEvent event;
+    private Debugger debugger;
 
     public ReceiveAndHandleAudioForChannel(VoiceChannel voiceChannel, MessageReceivedEvent event){
         this.voiceChannel = voiceChannel;
@@ -59,17 +60,18 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             return;
         }
 
-        final Debugger debugger =  Main.debugManager.getDebugger(voiceChannel.getGuild());
+        debugger =  Main.debugManager.getDebugger(voiceChannel.getGuild());
 
 
         // getting consent from all members before starting the recording
         for (Member member: voiceChannel.getMembers()){
+            if (member.getUser().isBot()) continue;
             member.getUser().openPrivateChannel().queue(privateChannel -> {
                 new ConsentMessage(privateChannel, voiceChannel, debugger);
-            });
+            }, e -> {debugger.error(e.getMessage());});
         }
 
-        debugger.info("Sent out all consent messages!");
+        debugger.debug("Sent out all consent messages!");
         // event.getChannel().sendMessageEmbeds(new Embed("Consent", "Sent out all consent messages!", Color.GREEN).build()).queue();
 
         // waiting 60 seconds for users to consent, then proceed to kick everyone from the vc that did not consent
@@ -84,13 +86,12 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         for (Member member: voiceChannel.getMembers()){
             if (member.getUser() == event.getJDA().getSelfUser()) continue;
 
-            if (!helper.hasConsented(voiceChannel, member.getUser())){
-                member.getUser().openPrivateChannel().queue(privateChannel -> {
-                    // privateChannel.sendMessageEmbeds(new Embed("Did not consent", "Since you did not consent, you will be removed from the voice channel!", Color.RED).build()).queue();
-                    voiceChannel.getGuild().moveVoiceMember(member, null).complete(); // disconnects them from the voice channel
-                });
+            if (member.getUser().isBot()) continue;
 
+            if (!helper.hasConsented(voiceChannel, member.getUser())) {
+                voiceChannel.getGuild().moveVoiceMember(member, null).complete();
             }
+
         }
 
 
@@ -100,6 +101,9 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             @Override
             public void trackLoaded(AudioTrack audioTrack) {
                debugger.debug("Successfully played the pre-recording message");
+               // debugger.debug(audioTrack.getState().toString());
+
+               playerManager.play(playerManager.getGuildMusicManager(event.getGuild()), audioTrack);
             }
 
             @Override
@@ -117,14 +121,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             }
         });
 
-        // waiting for the player to register the track so we can wait using a while loop
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        System.out.println(playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack());
+        // debugger.debug("Audio track: " + playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack());
         while (playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack() != null){
             try {
                 Thread.sleep(100);
@@ -170,32 +167,47 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         TextChannel channel = helper.getTextChannelById(voiceChannel.getGuild(), cache.getRecordingLogChannelId());
 
         if (channel != null){
-            try{
-                channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".wav").complete();
-            } catch (IllegalArgumentException e){
-                // file too big
-                compressFileToMp3(channel);
-            } catch (ErrorResponseException e){
-                int i = 1;
-                while (i <= 10){
-                    try{
-                        channel.sendMessageEmbeds(new Embed("Error", "There was an error while trying to upload the file... Retrying " + i + "/10 attempts!", Color.RED).build()).queue();
-                        channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".wav").complete();
-                        break;
-                    } catch (ErrorResponseException noted){
-                        i++;
-                    }
+            compressFileToMp3(channel);
 
+            try{
+                channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3").complete();
+            } catch (IllegalArgumentException e){
+                // file too big -> upload to cloud
+
+                try {
+                    String newFileName = voiceChannel.getName() + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3";
+                    Files.copy(Paths.get("data/" + fileName), Paths.get("data/" + newFileName));
+                    delFile(); // delete .mp3 file
+                    fileName = newFileName;
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
                 }
 
-            }
+                FileUpload fileUpload = null;
+                try{
+                    fileUpload = new FileUpload(new File("data/" + fileName), debugger);
+                } catch (IllegalStateException e1){
+                    int i = 1;
+                    while (i <= 10){
+                        try{
+                            fileUpload = new FileUpload(new File("data/" + fileName), debugger);
+                        } catch (IllegalStateException e2){
+                            i++;
+                        }
+                    }
+                }
 
-        } else {
-            System.err.println("Log channel has not been set, file will not be sent");
+                if (fileUpload == null){
+                    channel.sendMessageEmbeds(new Embed("Error", "Cannot upload file! Maximum tries (10) exceeded!", Color.RED).build()).queue();
+                    shouldDelete = false;
+                    return;
+                }
+
+                channel.sendMessage(fileUpload.getFileUrl() != null ? fileUpload.getFileUrl() : "There was an error when creating the link to the uploaded file!").queue();
+            }
         }
 
-
-        delFile();
+        delFile(); // delete final .mp3 file
 
     }
 
@@ -207,19 +219,29 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         String execString = "ffmpeg -y -i \"data/" + fileName + "\" \"data/" + fileName.replace(".wav", ".mp3") + "\"";
         // System.out.println(execString);
         try {
+            debugger.debug("Running ffmpeg command: " + execString);
             ffmpeg = runtime.exec(execString);
         } catch (IOException e) {
+            debugger.error("ERROR RUNNING FFMPEG");
             e.printStackTrace();
             channel.sendMessageEmbeds(new Embed("Error", "Could not run ffmpeg to compress file! Not deleting file!", Color.RED).build()).queue();
             shouldDelete = false;
             return;
         }
 
-        try {
-            ffmpeg.waitFor();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+
+        while(ffmpeg.isAlive()){
+            debugger.debug("FFMPEG is alive: " + ffmpeg.isAlive());
+            // debugger.debug(helper.getInputStreamContent(ffmpeg.getErrorStream())); // writes output to stderr ?????
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
+
+        debugger.debug("ffmpeg has finished");
 
         String output = null, error = null;
 
@@ -229,6 +251,8 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        debugger.debug("FFMPEG exit code: " + ffmpeg.exitValue());
 
         if (ffmpeg.exitValue() != 0){
             channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + ffmpeg.exitValue() + "\n```" + error + "```", Color.RED).build()).queue();
@@ -240,23 +264,11 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
         fileName = fileName.replace(".wav", ".mp3");
 
-        try{
-            channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3").complete();
-        } catch (IllegalArgumentException e){
-            // file too big -> upload to cloud
-
-            try {
-                Files.copy(Paths.get("data/" + fileName), Paths.get("data/" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3"));
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
-            }
-
-            fileName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3";
-            new FileUpload(new File("data/" + fileName));
-        }
+        debugger.debug("Finished compressToMp3()");
     }
 
     private void delFile(){
+        debugger.debug("delFile() : " + shouldDelete);
         try {
             if (shouldDelete)
                 Files.delete(Paths.get("data/" + fileName));

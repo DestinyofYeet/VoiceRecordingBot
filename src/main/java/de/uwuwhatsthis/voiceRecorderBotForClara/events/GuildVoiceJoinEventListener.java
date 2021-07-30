@@ -16,6 +16,7 @@ public class GuildVoiceJoinEventListener extends ListenerAdapter {
     @Override
     public void onGuildVoiceJoin(@NotNull GuildVoiceJoinEvent event){
         if (event.getMember().getUser() == event.getJDA().getSelfUser()) return;
+        if (event.getMember().getUser().isBot()) return;
 
         VoiceChannel voiceChannelJoined = event.getVoiceState().getChannel();
 

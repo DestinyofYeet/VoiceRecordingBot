@@ -5,6 +5,8 @@ import de.uwuwhatsthis.voiceRecorderBotForClara.messageReactionStuff.ReactionEmo
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.helper;
 import net.dv8tion.jda.api.entities.PrivateChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
+import net.dv8tion.jda.api.exceptions.ErrorHandler;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 
 import java.awt.*;
 
@@ -67,6 +69,6 @@ public class ConsentMessage implements Runnable {
             if (joinedAfterInit){
                 message.editMessageEmbeds(new Embed("Did not consent", "Your time expired. You did not consent and cannot join the voice channel!", Color.RED).build()).queue();
             }
-        });
+        }, new ErrorHandler().ignore(ErrorResponse.CANNOT_SEND_TO_USER));
     }
 }

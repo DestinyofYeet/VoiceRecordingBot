@@ -11,6 +11,7 @@ public class Config {
     private String cloudDomain;
     private String cloudEmail;
     private String cloudPassword;
+    private String cloudUploadPath;
 
     private boolean debug;
 
@@ -34,6 +35,7 @@ public class Config {
         cloudDomain = jsonObject.getString("cloud_domain");
         cloudEmail = jsonObject.getString("cloud_email");
         cloudPassword = jsonObject.getString("cloud_password");
+        cloudUploadPath = jsonObject.getString("cloud_upload_path");
     }
 
     public String getFilePath() {
@@ -66,5 +68,9 @@ public class Config {
 
     public String getCloudDomain() {
         return cloudDomain;
+    }
+
+    public String getCloudUploadPath() {
+        return cloudUploadPath;
     }
 }

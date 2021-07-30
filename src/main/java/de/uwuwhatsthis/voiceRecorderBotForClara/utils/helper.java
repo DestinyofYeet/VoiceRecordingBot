@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class helper {
 
@@ -129,5 +130,10 @@ public class helper {
         list.remove(member.getIdLong());
 
         Constants.USER_ALLOWED_IN_CHANNEL.put(voiceChannel, list);
+    }
+
+    public static String getInputStreamContent(InputStream inputStream){
+        return new BufferedReader(new InputStreamReader(inputStream))
+                .lines().collect(Collectors.joining("\n"));
     }
 }

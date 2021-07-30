@@ -2,10 +2,13 @@ package de.uwuwhatsthis.voiceRecorderBotForClara.commands;
 
 import de.uwuwhatsthis.voiceRecorderBotForClara.audio.ReceiveAndHandleAudioForChannel;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Args;
+import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Cache;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Embed;
+import de.uwuwhatsthis.voiceRecorderBotForClara.main.Main;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.Constants;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.helper;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 
@@ -17,7 +20,7 @@ public class RecordStart {
 
     public void execute(MessageReceivedEvent event, Args args){
         if (!event.getMember().hasPermission(PERMISSION_NEEDED)){
-            event.getChannel().sendMessageEmbeds(new Embed("Insufficient Permissions", "Insufficient permissions! You need the " + PERMISSION_NEEDED.toString() + " for this command!", Color.RED).build()).queue();
+            event.getChannel().sendMessageEmbeds(new Embed("Insufficient pnermissions", "Insufficient permissions! You need the " + PERMISSION_NEEDED.toString() + " permission for this command!", Color.RED).build()).queue();
             return;
         }
 
@@ -37,6 +40,13 @@ public class RecordStart {
 
         if (voiceChannel.getMembers().isEmpty()){
             event.getChannel().sendMessageEmbeds(new Embed("Error", "The channel you are trying to record is empty!", Color.RED).build()).queue();
+            return;
+        }
+
+        Cache cache = Main.cacheManager.getCacheForServer(event.getGuild().getId());
+
+        if (helper.getTextChannelById(voiceChannel.getGuild(), cache.getRecordingLogChannelId()) == null){
+            event.getChannel().sendMessageEmbeds(new Embed("Error", "You don't have a channel set to store the voice-logs in! Set one using `" + Main.config.getPrefix() + "record-channel <channelId>`!", Color.RED).build()).queue();
             return;
         }
 

@@ -36,7 +36,9 @@ public class RecordStop {
 
         vc.getGuild().getAudioManager().setReceivingHandler(null);
 
-        audioHandler.saveAudio();
+        if (audioHandler == null) return;
+
+        new Thread(audioHandler::saveAudio).start(); // creating a new Thread otherwise the whole thing will break & jda big cry
 
         vc.getGuild().getAudioManager().closeAudioConnection();
     }
