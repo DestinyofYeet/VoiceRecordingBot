@@ -2,7 +2,7 @@ package de.uwuwhatsthis.voiceRecorderBotForClara.managers;
 
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.Cache;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.JsonStuff;
-import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -15,10 +15,10 @@ import java.util.List;
 
 public class CacheManager {
     public static List<Cache> allCaches = new ArrayList<>();
-    private final String filePath;
+    private final String cacheFilePath;
 
     public CacheManager (String filePath){
-        this.filePath = filePath;
+        this.cacheFilePath = filePath;
 
         if (!Files.exists(Paths.get(filePath))){
             try {
@@ -31,16 +31,22 @@ public class CacheManager {
     }
 
     private void createCacheFile() throws IOException{
-        File file = new File(filePath);
+        File file = new File(cacheFilePath);
         FileWriter fw = new FileWriter(file);
         fw.write("{}");
+        fw.flush();
+        fw.close();
     }
 
     public Cache getCacheForServer(String serverId){
-        JSONObject file = new JSONObject(JsonStuff.getFileContent(filePath));
-        JSONObject data = file.getJSONObject(serverId);
-
-        return new Cache(data, serverId);
+        JSONObject file = new JSONObject(JsonStuff.getFileContent(cacheFilePath));
+        JSONObject data;
+        try{
+            data = file.getJSONObject(serverId);
+            return new Cache(data, serverId);
+        } catch (JSONException e){
+            return createNewCacheForServer(serverId);
+        }
     }
 
     private Cache createNewCacheForServer(String serverId){
@@ -53,6 +59,6 @@ public class CacheManager {
             data.put(cache.getGuildID(), cache.getData());
         }
 
-        JsonStuff.writeToJsonFile(filePath, data.toString(2));
+        JsonStuff.writeToJsonFile(cacheFilePath, data.toString(2));
     }
 }
