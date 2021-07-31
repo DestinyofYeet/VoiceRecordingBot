@@ -41,6 +41,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
     private boolean shouldDelete = true;
     private MessageReceivedEvent event;
     private Debugger debugger;
+    private File fileToUpload;
 
     public ReceiveAndHandleAudioForChannel(VoiceChannel voiceChannel, MessageReceivedEvent event){
         this.voiceChannel = voiceChannel;
@@ -118,6 +119,8 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
             @Override
             public void loadFailed(FriendlyException e) {
+                debugger.error("Could not load pre-recording message");
+                e.printStackTrace();
             }
         });
 
@@ -153,12 +156,13 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
     public void saveAudio(){
         helper.setRecordingStatus(voiceChannel.getGuild(), Status.IDLE);
-        File file = new File("data/" + fileName);
+        File file = fileToUpload =  new File("data/" + fileName);
 
         byte[] byteData = helper.convertObjectArrayToByteArray(voiceData);
 
         try {
            helper.getWavFile(file, byteData);
+           debugger.debug("Saved file to " + file.getAbsolutePath());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -216,7 +220,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
         Process ffmpeg;
 
-        String execString = "ffmpeg -y -i \"data/" + fileName + "\" \"data/" + fileName.replace(".wav", ".mp3") + "\"";
+        String execString = "ffmpeg -y -i \"" + fileToUpload.getAbsolutePath() + "\" \"" + Paths.get(fileToUpload.getAbsolutePath()).getParent().toAbsolutePath() + "/" + fileName.replace(".wav", ".mp3") + "\"";
         // System.out.println(execString);
         try {
             debugger.debug("Running ffmpeg command: " + execString);
@@ -241,7 +245,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             }
         }
 
-        debugger.debug("ffmpeg has finished");
+        debugger.debug("FFMPEG has finished");
 
         String output = null, error = null;
 
@@ -255,7 +259,14 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         debugger.debug("FFMPEG exit code: " + ffmpeg.exitValue());
 
         if (ffmpeg.exitValue() != 0){
-            channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + ffmpeg.exitValue() + "\n```" + error + "```", Color.RED).build()).queue();
+            try{
+                channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + ffmpeg.exitValue() + "\n```" + error + "```", Color.RED).build()).queue();
+            } catch (IllegalArgumentException e){
+                // embed too big
+                channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + ffmpeg.exitValue(), Color.RED).build()).queue();
+                helper.sendFile(channel, error, "ffmpeg-error.txt");
+            }
+
             delFile();
             return;
         }

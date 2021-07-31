@@ -10,6 +10,8 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -135,5 +137,23 @@ public class helper {
     public static String getInputStreamContent(InputStream inputStream){
         return new BufferedReader(new InputStreamReader(inputStream))
                 .lines().collect(Collectors.joining("\n"));
+    }
+
+    public static void sendFile(MessageChannel channel, String content, String filename){
+        File file = new File("data/temp.txt");
+        try {
+            FileWriter fw = new FileWriter(file);
+            fw.write(content);
+            fw.flush();
+            fw.close();
+            channel.sendFile(file, filename).queue();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            Files.delete(Paths.get("data/temp.txt"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
