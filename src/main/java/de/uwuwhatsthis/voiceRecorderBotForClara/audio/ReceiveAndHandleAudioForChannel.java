@@ -6,33 +6,24 @@ import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import de.uwuwhatsthis.voiceRecorderBotForClara.customObjects.*;
 import de.uwuwhatsthis.voiceRecorderBotForClara.main.Main;
-import de.uwuwhatsthis.voiceRecorderBotForClara.messageReactionStuff.ReactionEmotes;
-import de.uwuwhatsthis.voiceRecorderBotForClara.utils.Constants;
 import de.uwuwhatsthis.voiceRecorderBotForClara.utils.helper;
 import net.dv8tion.jda.api.audio.AudioReceiveHandler;
 import net.dv8tion.jda.api.audio.CombinedAudio;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.exceptions.ErrorHandler;
-import net.dv8tion.jda.api.exceptions.ErrorResponseException;
-import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 
-import javax.xml.soap.Text;
 import java.awt.*;
 import java.io.*;
-import java.net.SocketTimeoutException;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class ReceiveAndHandleAudioForChannel implements Runnable{
     private final VoiceChannel voiceChannel;
@@ -42,6 +33,8 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
     private MessageReceivedEvent event;
     private Debugger debugger;
     private File fileToUpload;
+    private File audioFile;
+    private boolean ffmpegSuccessful = false;
 
     public ReceiveAndHandleAudioForChannel(VoiceChannel voiceChannel, MessageReceivedEvent event){
         this.voiceChannel = voiceChannel;
@@ -98,10 +91,11 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
         // loading & playing the pre-recorded message
         PlayerManager playerManager = PlayerManager.getInstance();
-        playerManager.loadAndPlay(voiceChannel.getGuild(), Main.config.getPreMessagePath(), new AudioLoadResultHandler() {
+        debugger.debug("Pre message url: " + Main.config.getPreMessageURL());
+        playerManager.loadAndPlay(voiceChannel.getGuild(), Main.config.getPreMessageURL(), new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack audioTrack) {
-               debugger.debug("Successfully played the pre-recording message");
+               debugger.debug("Successfully playing the pre-recording message");
                // debugger.debug(audioTrack.getState().toString());
 
                playerManager.play(playerManager.getGuildMusicManager(event.getGuild()), audioTrack);
@@ -123,6 +117,12 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
                 e.printStackTrace();
             }
         });
+
+        try {
+            Thread.sleep(1000); // wait for the player to load the message
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         // debugger.debug("Audio track: " + playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack());
         while (playerManager.getGuildMusicManager(voiceChannel.getGuild()).player.getPlayingTrack() != null){
@@ -156,13 +156,13 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
     public void saveAudio(){
         helper.setRecordingStatus(voiceChannel.getGuild(), Status.IDLE);
-        File file = fileToUpload =  new File("data/" + fileName);
+        audioFile = new File("data/" + fileName);
 
         byte[] byteData = helper.convertObjectArrayToByteArray(voiceData);
 
         try {
-           helper.getWavFile(file, byteData);
-           debugger.debug("Saved file to " + file.getAbsolutePath());
+           helper.getWavFile(audioFile, byteData);
+           debugger.debug("Saved file to " + audioFile.getAbsolutePath());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -173,68 +173,90 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         if (channel != null){
             compressFileToMp3(channel);
 
+            String newFileName = voiceChannel.getName() + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK_mm a")) + ".mp3";
+            newFileName = newFileName.replaceAll(" ", "_");
+
+            debugger.debug("Uploading file");
+
             try{
-                channel.sendFile(new File("data/" + fileName), LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3").complete();
+                channel.sendFile(audioFile, newFileName).complete();
+                debugger.debug("Uploaded file to textchannel");
             } catch (IllegalArgumentException e){
                 // file too big -> upload to cloud
 
-                try {
-                    String newFileName = voiceChannel.getName() + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy-KK__mm a")) + ".mp3";
-                    Files.copy(Paths.get("data/" + fileName), Paths.get("data/" + newFileName));
-                    delFile(); // delete .mp3 file
-                    fileName = newFileName;
-                } catch (IOException ioException) {
-                    ioException.printStackTrace();
-                }
-
                 FileUpload fileUpload = null;
                 try{
-                    fileUpload = new FileUpload(new File("data/" + fileName), debugger);
+                    fileUpload = new FileUpload(audioFile, debugger);
                 } catch (IllegalStateException e1){
-                    int i = 1;
-                    while (i <= 10){
+                    debugger.debug("Failed to upload file to cloud...Entering while loop");
+                    int i = 0;
+                    while (i < 10){
                         try{
-                            fileUpload = new FileUpload(new File("data/" + fileName), debugger);
+                            debugger.debug("Upload attempt " + i + ".....");
+                            fileUpload = new FileUpload(audioFile, debugger);
+                            debugger.debug("Upload attempt " + i + ": Successful");
                         } catch (IllegalStateException e2){
+                            debugger.debug("Upload attempt " + i + ": Failed...Retrying");
                             i++;
                         }
                     }
+                    debugger.debug("Maximum tries reached!");
                 }
 
                 if (fileUpload == null){
+                    debugger.debug("Failed to upload file to cloud!");
                     channel.sendMessageEmbeds(new Embed("Error", "Cannot upload file! Maximum tries (10) exceeded!", Color.RED).build()).queue();
-                    shouldDelete = false;
                     return;
+
+                } else{
+                    debugger.debug("Uploaded file to cloud!");
                 }
 
                 channel.sendMessage(fileUpload.getFileUrl() != null ? fileUpload.getFileUrl() : "There was an error when creating the link to the uploaded file!").queue();
             }
         }
 
-        delFile(); // delete final .mp3 file
+        delFile(); // delete final after upload
 
     }
 
+    /**
+     * Compresses the current .wav file to a .mp3 file
+     * @param channel The channel to send messages generated in this function in
+     */
     private void compressFileToMp3(TextChannel channel){
-        Runtime runtime = Runtime.getRuntime();
 
         Process ffmpeg;
+        ProcessBuilder ffmpegProcessBuilder = new ProcessBuilder("ffmpeg", "-y", "-i", audioFile.getAbsolutePath(), Paths.get(audioFile.getAbsolutePath()).getParent().toAbsolutePath() + "/" + fileName.replace(".wav", ".mp3"));
 
-        String execString = "ffmpeg -y -i \"" + fileToUpload.getAbsolutePath() + "\" \"" + Paths.get(fileToUpload.getAbsolutePath()).getParent().toAbsolutePath() + "/" + fileName.replace(".wav", ".mp3") + "\"";
+        String execString = "ffmpeg -y -i \"" + audioFile.getAbsolutePath() + "\" \"" + Paths.get(audioFile.getAbsolutePath()).getParent().toAbsolutePath() + "/" + fileName.replace(".wav", ".mp3") + "\"";
         // System.out.println(execString);
+
+        audioFileCheck();
+
         try {
             debugger.debug("Running ffmpeg command: " + execString);
-            ffmpeg = runtime.exec(execString);
+            debugger.debug("Process builder commands: " + ffmpegProcessBuilder.command().toString());
+            ffmpeg = ffmpegProcessBuilder.start();
         } catch (IOException e) {
             debugger.error("ERROR RUNNING FFMPEG");
             e.printStackTrace();
             channel.sendMessageEmbeds(new Embed("Error", "Could not run ffmpeg to compress file! Not deleting file!", Color.RED).build()).queue();
-            shouldDelete = false;
             return;
         }
 
-
+        long secondsTimeSpentCompiling = 0;
         while(ffmpeg.isAlive()){
+            if (secondsTimeSpentCompiling >= 10*60){
+                debugger.error("Compilation took over 10 minutes, killing process!");
+                ffmpeg.destroyForcibly();
+                try {
+                    ffmpeg.waitFor();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return;
+            }
             debugger.debug("FFMPEG is alive: " + ffmpeg.isAlive());
             // debugger.debug(helper.getInputStreamContent(ffmpeg.getErrorStream())); // writes output to stderr ?????
 
@@ -243,6 +265,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            secondsTimeSpentCompiling += 1;
         }
 
         debugger.debug("FFMPEG has finished");
@@ -259,32 +282,45 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         debugger.debug("FFMPEG exit code: " + ffmpeg.exitValue());
 
         if (ffmpeg.exitValue() != 0){
-            try{
-                channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + ffmpeg.exitValue() + "\n```" + error + "```", Color.RED).build()).queue();
-            } catch (IllegalArgumentException e){
-                // embed too big
-                channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + ffmpeg.exitValue(), Color.RED).build()).queue();
-                helper.sendFile(channel, error, "ffmpeg-error.txt");
-            }
 
-            delFile();
+            ffmpegError(channel, error, ffmpeg.exitValue());
             return;
         }
+        ffmpegSuccessful = true;
         delFile(); // delete original .wav file
 
 
         fileName = fileName.replace(".wav", ".mp3");
+        audioFile = new File("data/" + fileName);
+
+        audioFileCheck();
 
         debugger.debug("Finished compressToMp3()");
     }
 
     private void delFile(){
         debugger.debug("delFile() : " + shouldDelete);
-        try {
-            if (shouldDelete)
-                Files.delete(Paths.get("data/" + fileName));
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (shouldDelete){
+            boolean result = audioFile.delete();
+            debugger.debug((result ? "Successfully deleted " : "Failed to delete ") + " file " + audioFile.getAbsolutePath());
+        }
+        shouldDelete = true;
+    }
+
+    private void audioFileCheck(){
+        debugger.debug("Audiofile: " + audioFile.getAbsolutePath());
+        debugger.debug("Audiofile exists: " + (audioFile.exists() ? "yes" : "no"));
+        debugger.debug("Audiofile readable: " + (audioFile.canRead() ? "yes": "no"));
+        debugger.debug("Audiofile writeable: " + (audioFile.canWrite() ? "yes": "no"));
+    }
+
+    private synchronized void ffmpegError(MessageChannel channel, String error, int exitValue){
+        try{
+            channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + exitValue + "\n```" + error + "```", Color.RED).build()).queue();
+        } catch (IllegalArgumentException e){
+            // embed too big
+            channel.sendMessageEmbeds(new Embed("Error", "FFMPEG exited with non-zero exit code: " + exitValue, Color.RED).build()).queue();
+            helper.sendFile(channel, error, "ffmpeg-error.txt");
         }
     }
 }

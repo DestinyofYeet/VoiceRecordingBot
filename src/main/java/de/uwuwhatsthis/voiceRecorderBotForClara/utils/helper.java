@@ -80,6 +80,7 @@ public class helper {
 
     public static void getWavFile(File outFile, byte[] decodedData) throws IOException {
         AudioFormat format = new AudioFormat(48_000, 16, 2, true, true);
+
         AudioSystem.write(new AudioInputStream(new ByteArrayInputStream(
                 decodedData), format, decodedData.length), AudioFileFormat.Type.WAVE, outFile);
     }

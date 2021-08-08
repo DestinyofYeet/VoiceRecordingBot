@@ -7,7 +7,7 @@ public class Config {
     private final String filePath;
     private String token;
     private String prefix;
-    private String preMessagePath;
+    private String preMessageURL;
     private String cloudDomain;
     private String cloudEmail;
     private String cloudPassword;
@@ -30,7 +30,7 @@ public class Config {
         JSONObject jsonObject = new JSONObject(fileContent);
         token = jsonObject.getString("token");
         prefix = jsonObject.getString("prefix");
-        preMessagePath = jsonObject.getString("pre_recording_message_path");
+        preMessageURL = jsonObject.getString("pre_recording_message_url");
         debug = jsonObject.getBoolean("debug");
         cloudDomain = jsonObject.getString("cloud_domain");
         cloudEmail = jsonObject.getString("cloud_email");
@@ -50,8 +50,8 @@ public class Config {
         return prefix;
     }
 
-    public String getPreMessagePath() {
-        return preMessagePath;
+    public String getPreMessageURL() {
+        return preMessageURL;
     }
 
     public boolean isDebug() {
