@@ -18,9 +18,7 @@ public class GuildVoiceLeaveEventListener extends ListenerAdapter {
 
         if (event.getChannelLeft().equals(event.getGuild().getMember(event.getJDA().getSelfUser()).getVoiceState().getChannel())){
             if (event.getChannelLeft().getMembers()
-                    .stream()
-                    .filter(member -> !member.getUser().isBot())
-                    .count() < 1){
+                    .stream().allMatch(member -> member.getUser().isBot())){
                 GuildMusicManager manager = PlayerManager.getInstance().getGuildMusicManager(event.getGuild());
                 AudioManager audioManager = event.getGuild().getAudioManager();
                 audioManager.closeAudioConnection();

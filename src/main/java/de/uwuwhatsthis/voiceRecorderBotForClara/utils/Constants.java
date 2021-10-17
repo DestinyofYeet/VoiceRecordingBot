@@ -1,6 +1,5 @@
 package de.uwuwhatsthis.voiceRecorderBotForClara.utils;
 
-import de.uwuwhatsthis.voiceRecorderBotForClara.audio.PlayerManager;
 import de.uwuwhatsthis.voiceRecorderBotForClara.audio.ReceiveAndHandleAudioForChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
 
@@ -12,8 +11,7 @@ public class Constants {
     public final static HashMap<String, String> COMMAND_MAP = new HashMap<String, String>(){{
         put("record-start", "RecordStart");
         put("record-stop", "RecordStop");
-        put("recording-channel", "RecordingChannel");
-        put("upload-test", "UploadTest");
+        put("record-logs", "RecordingChannel");
     }};
 
     public final static HashMap<VoiceChannel, ReceiveAndHandleAudioForChannel> AUDIO_MAP = new HashMap<>();

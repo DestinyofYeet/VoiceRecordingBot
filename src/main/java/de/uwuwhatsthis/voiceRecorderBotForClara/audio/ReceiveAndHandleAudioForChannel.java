@@ -35,13 +35,17 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
     private File fileToUpload;
     private File audioFile;
     private boolean ffmpegSuccessful = false;
+    private final Thread thread;
+    private boolean hasStartedRecording;
 
     public ReceiveAndHandleAudioForChannel(VoiceChannel voiceChannel, MessageReceivedEvent event){
         this.voiceChannel = voiceChannel;
         this.event = event;
-        fileName = "audio_" + voiceChannel.getId() + ".wav";
 
-        Thread thread = new Thread(this);
+        fileName = "audio_" + voiceChannel.getId() + ".wav";
+        hasStartedRecording = false;
+
+        thread = new Thread(this);
         thread.start();
     }
 
@@ -72,7 +76,8 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         try {
             Thread.sleep(60*1000);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            // the recording was stopped while the time wasn't over yet
+            return;
         }
 
         // event.getChannel().sendMessageEmbeds(new Embed("Consent", "Kicking all users that did not consent from the voice channel!", Color.GREEN).build()).queue();
@@ -136,6 +141,7 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
         event.getChannel().sendMessageEmbeds(new Embed("Recording", "The bot is now recording in channel " + voiceChannel.getAsMention() + "!", Color.GREEN).build()).queue();
 
         helper.setRecordingStatus(voiceChannel.getGuild(), Status.RECORDING);
+        this.hasStartedRecording = true;
 
         // recording stuff
         voiceChannel.getGuild().getAudioManager().setReceivingHandler(new AudioReceiveHandler() {
@@ -156,6 +162,10 @@ public class ReceiveAndHandleAudioForChannel implements Runnable{
 
     public void saveAudio(){
         helper.setRecordingStatus(voiceChannel.getGuild(), Status.IDLE);
+        if (!this.hasStartedRecording){
+            thread.interrupt();
+            return;
+        }
         audioFile = new File("data/" + fileName);
 
         byte[] byteData = helper.convertObjectArrayToByteArray(voiceData);
